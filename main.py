@@ -112,7 +112,7 @@ async def select(ctx, options, kind):
         # Tell users what options they have.
         msg = ''
         for i in range(len(options)):
-            msg += f'({i + 1}) {options[i]}\n'
+            msg += f'`({i + 1})` `{options[i]}`\n'
 
         embed = discord.Embed(
             title=title,
@@ -227,5 +227,3 @@ async def assist(ctx, *arg):
 
 client.load_extension('server')
 client.run(os.environ['TOKEN'])
-
-'testing'
