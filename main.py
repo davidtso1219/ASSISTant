@@ -227,3 +227,5 @@ async def assist(ctx, *arg):
 
 client.load_extension('server')
 client.run(os.environ['TOKEN'])
+
+'testing'
