@@ -1,11 +1,11 @@
 import requests
-import discord
 import asyncio
 from discord.ext import commands
 
 from college import College
 from major import Major
-from emojis import emojis, numeric_emojis
+from emojis import emojis, numeric_emojis, num_emojis
+from page import Page
 
 
 url = 'https://assist.org/api/institutions'
@@ -46,44 +46,92 @@ class Admin(commands.Cog):
             title = f'Choose from these {len(options)} options for your {kind}:'
 
             # Tell users what options they have.
-            msg = ''
-            for i in range(len(options)):
+            pages = []
 
-                msg += f'`{i + 1}` {options[i].name} '
+            msg = ''
+            count = 0
+            for i in range(len(options)):
+                
+                if count >= 5:
+                    page = Page(title, msg, count=count)
+                    if pages:
+                        page.prev = pages[-1]
+                        pages[-1].next = page
+                    pages.append(page)
+                    msg = ''
+                    count = 0
+
+                msg += f'`{count + 1}` {options[i].name} '
 
                 if kind == 'Home College' or kind == 'Target College':
-                    msg += f'**{options[i].code}**\n'
+                    msg += f'**{options[i].code}**'
                 
-                msg += '\n'
+                msg += '\n\n'
+                count += 1
+            
+            page = Page(title, msg, count=count)
+            if pages:
+                page.prev = pages[-1]
+                pages[-1].next = page
+            pages.append(page)
 
-            embed = discord.Embed(
-                title=title,
-                description=msg,
-                color=discord.Color.blue()
-            )
+
+            embed = pages[0].getEmbed()
 
             msg = await ctx.channel.send(embed=embed)
-            for emoji in list(numeric_emojis.values())[0:5]:
-                await msg.add_reaction(emoji)
+
+            await self.showReactions(msg, pages[0])
 
             # Check function for the wait_for function later.
-            def check(m):
-                try:
-                    num = int(m.content)
-                    return m.channel == ctx.channel and 1 <= num <= len(
-                        options) and m.author == ctx.author
-                except ValueError:
-                    return False
+            def check(reaction, user):
+                emoji = str(reaction.emoji)
+                return (emoji in num_emojis or emoji in emojis.values()) and user == ctx.author
 
             # Get the message from users.
+            count = 0
+            curr = pages[0]
+
             try:
-                msg = await self.client.wait_for('message', timeout=20.0, check=check)
+
+                while True:
+
+                    reaction, user = await self.client.wait_for('reaction_add', timeout=20.0, check=check)
+
+                    if str(reaction.emoji) in num_emojis:
+                        break
+
+                    if str(reaction.emoji) == emojis['next']:
+                        curr = curr.next
+                        await msg.edit(embed=curr.getEmbed())
+                        await self.showReactions(msg, curr)
+
+                    elif str(reaction.emoji) == emojis['back']:
+                        curr = curr.prev
+                        await msg.edit(embed=curr.getEmbed())
+                        await self.showReactions(msg, curr)
+                    
+
             except asyncio.TimeoutError:
                 await ctx.channel.send(":no_entry:  **Closed due to the inaction.**")
+                await msg.delete()
+
             else:
-                await ctx.channel.send('👍')
-                await ctx.channel.send(f'Ok! You choose {options[int(msg.content) - 1].name}.')
-                return options[int(msg.content) - 1]
+                await ctx.channel.send(f'Ok! You choose {options[num_emojis[reaction.emoji] - 1].name}.')
+                await msg.delete()
+                return options[num_emojis[reaction.emoji] - 1]
+
+    async def showReactions(self, msg, page):
+        await msg.clear_reactions()
+        
+        if page.hasPrev():
+            await msg.add_reaction(emojis['back'])
+
+        for emoji in list(numeric_emojis.values())[0:page.count]:
+            await msg.add_reaction(emoji)
+
+        if page.hasNext():
+            await msg.add_reaction(emojis['next'])
+
 
     @commands.command()
     async def assist(self, ctx, *arg):
@@ -132,7 +180,7 @@ class Admin(commands.Cog):
         #
         if not agreement:
             await ctx.channel.send(
-                f"Sorry there is no agreement between {final_home_college} and {final_target_college}"
+                f"Sorry there is no agreement between {final_home_college.name} and {final_target_college.name}"
             )
             return
 
@@ -146,7 +194,7 @@ class Admin(commands.Cog):
         final_major = await self.select(ctx, major_options, 'Major')
 
         for major in reports:
-            if major['label'] == final_major:
+            if major['label'] == final_major.name:
                 key = major['key']
 
         if key:

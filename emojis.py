@@ -1,6 +1,8 @@
 emojis = {
     'thumbsup' : '\U0001F44D',
     'one' : '\u0031',
+    'next' : '▶️',
+    'back' : '◀️'
 }
 
 num_emojis = {
