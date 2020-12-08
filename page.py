@@ -2,22 +2,25 @@ import discord
 
 class Page():
 
-    def __init__(self, title, msg, count, next=None, prev=None):
+    def __init__(self, title, msg, count, page_num, next=None, prev=None):
         self.title = title
         self.msg = msg
         self.count = count
+        self.page_num = page_num
         self.next = next
         self.prev = prev
 
     def getEmbed(self):
 
-        embed = discord.Embed(
+        self.embed = discord.Embed(
             title=self.title,
             description=self.msg,
-            color=discord.Color.blue()
+            color=discord.Color.blue(),
         )
 
-        return embed
+        self.embed.set_footer(text=f'page {self.page_num}')
+
+        return self.embed
 
     def hasNext(self):
         return self.next is not None

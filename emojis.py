@@ -2,7 +2,9 @@ emojis = {
     'thumbsup' : '\U0001F44D',
     'one' : '\u0031',
     'next' : '▶️',
-    'back' : '◀️'
+    'back' : '◀️',
+    'check' : ":white_check_mark:",
+    'flag' : ":checkered_flag:"
 }
 
 num_emojis = {

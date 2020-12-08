@@ -1,7 +1,8 @@
 import requests
 import asyncio
-from discord.ext import commands
+import discord
 
+from discord.ext import commands
 from college import College
 from major import Major
 from emojis import emojis, numeric_emojis, num_emojis
@@ -26,21 +27,21 @@ class Admin(commands.Cog):
         if not len(options):
 
             if kind == 'Target College':
-                await ctx.channel.send(
-                    f'There is no agreement of your home college and your target college.'
-                )
+                description = f'There is no agreement of your home college and your target college.'
             else:
-                await ctx.channel.send(f'{kind} Not Found!')
+                description = f'{kind} Not Found!'
+            
+            return [], description
 
         # If there is only one option, it is the one we are looking for.
         elif len(options) == 1:
 
-            if "**" not in options[0].name:
-                await ctx.channel.send(f'Found your {kind}, **{options[0].name}**!')
-            else:
-                await ctx.channel.send(f'Found your {kind}, {options[0].name}!')
+            kind = kind.split()[0]
+            kind += "." * (6 - len(kind))
 
-            return options[0]
+            description = f'{emojis["check"]}`{kind}` {options[0].name}'
+
+            return options[0], description
 
         else:
             title = f'Choose from these {len(options)} options for your {kind}:'
@@ -48,18 +49,23 @@ class Admin(commands.Cog):
             # Tell users what options they have.
             pages = []
 
+            def addPage(page):
+                if pages:
+                    page.prev = pages[-1]
+                    pages[-1].next = page
+                pages.append(page)
+
             msg = ''
             count = 0
+            page_num = 1
             for i in range(len(options)):
                 
                 if count >= 5:
-                    page = Page(title, msg, count=count)
-                    if pages:
-                        page.prev = pages[-1]
-                        pages[-1].next = page
-                    pages.append(page)
+                    page = Page(title, msg, count, page_num)
+                    addPage(page)
                     msg = ''
                     count = 0
+                    page_num += 1
 
                 msg += f'`{count + 1}` {options[i].name} '
 
@@ -69,26 +75,19 @@ class Admin(commands.Cog):
                 msg += '\n\n'
                 count += 1
             
-            page = Page(title, msg, count=count)
-            if pages:
-                page.prev = pages[-1]
-                pages[-1].next = page
-            pages.append(page)
-
+            page = Page(title, msg, count, page_num)
+            addPage(page)
 
             embed = pages[0].getEmbed()
-
             msg = await ctx.channel.send(embed=embed)
-
             await self.showReactions(msg, pages[0])
 
             # Check function for the wait_for function later.
             def check(reaction, user):
                 emoji = str(reaction.emoji)
-                return (emoji in num_emojis or emoji in emojis.values()) and user == ctx.author
+                return (emoji in num_emojis or emoji in emojis.values()) and user == ctx.author and reaction.message.id == msg.id and user.id != ctx.bot.user.id
 
             # Get the message from users.
-            count = 0
             curr = pages[0]
 
             try:
@@ -112,17 +111,20 @@ class Admin(commands.Cog):
                     
 
             except asyncio.TimeoutError:
-                await ctx.channel.send(":no_entry:  **Closed due to the inaction.**")
+                await ctx.channel.send(":no_entry:  **Closed due to the inactivity.**")
                 await msg.delete()
+                return
 
             else:
-                await ctx.channel.send(f'Ok! You choose {options[num_emojis[reaction.emoji] - 1].name}.')
+                kind = kind.split()[0]
+                kind += "." * (6 - len(kind))
+                description = f'{emojis["check"]}`{kind}` {options[num_emojis[reaction.emoji] + 5 * (curr.page_num - 1) - 1].name}'
                 await msg.delete()
-                return options[num_emojis[reaction.emoji] - 1]
+                return options[num_emojis[reaction.emoji] + 5 * (curr.page_num - 1) - 1], description
 
     async def showReactions(self, msg, page):
         await msg.clear_reactions()
-        
+
         if page.hasPrev():
             await msg.add_reaction(emojis['back'])
 
@@ -155,8 +157,15 @@ class Admin(commands.Cog):
         home_options = findColleges(home_college)
 
         # Show them the options and make them choose.
-        final_home_college = await self.select(ctx, home_options, 'Home College')
+        final_home_college, description = await self.select(ctx, home_options, 'Home College')
         sending_id = final_home_college.id
+
+        embed = discord.Embed(
+            title="Assist Report",
+            description = description
+        )
+
+        msg = await ctx.channel.send(embed=embed)
 
         # Get the sending_id of users' final home college.
         if not sending_id:
@@ -166,8 +175,16 @@ class Admin(commands.Cog):
         target_options = findColleges(target_college)
 
         # Show them the options and make them choose.
-        final_target_college = await self.select(ctx, target_options, 'Target College')
+        try:
+            final_target_college, description2 = await self.select(ctx, target_options, 'Target College')
+        except TypeError:
+            await msg.delete()
+            return
+
         receiving_id = final_target_college.id
+
+        embed.description += '\n' + description2
+        await msg.edit(embed=embed)
 
         # Get the receiving_id of users' final home college.
         if not receiving_id:
@@ -191,19 +208,28 @@ class Admin(commands.Cog):
 
         major_options = findMajor(major, reports)
 
-        final_major = await self.select(ctx, major_options, 'Major')
+        try:
+            final_major, description3 = await self.select(ctx, major_options, 'Major')
+        except TypeError:
+            await msg.delete()
+            return
+
+        embed.description += '\n' + description3
+        await msg.edit(embed=embed)
 
         for major in reports:
             if major['label'] == final_major.name:
                 key = major['key']
 
         if key:
-            await ctx.channel.send(
-                f"Here is your agreement:\nhttps://assist.org/transfer/report/{key}"
-            )
+            
+            embed.description += f"\n{emojis['flag']}`Report` **Your report is at**"
+            embed.description += f"\n**https://assist.org/transfer/report/{key}**"
 
         else:
-            await ctx.channel.send("Sorry I didn't find your agreement...")
+            embed.description += "\nSorry I didn't find your agreement..."
+
+        await msg.edit(embed=embed)
 
 def findColleges(target):
     """
