@@ -2,11 +2,12 @@ import discord
 
 class Page():
 
-    def __init__(self, title, msg, count, page_num, next=None, prev=None):
+    def __init__(self, title, msg, count, page_num, total_pages=None, next=None, prev=None):
         self.title = title
         self.msg = msg
         self.count = count
         self.page_num = page_num
+        self.total_pages = total_pages
         self.next = next
         self.prev = prev
 
@@ -18,7 +19,7 @@ class Page():
             color=discord.Color.blue(),
         )
 
-        self.embed.set_footer(text=f'page {self.page_num}')
+        self.embed.set_footer(text=f"Page {self.page_num}{f' of {self.total_pages}' if self.total_pages else ''}")
 
         return self.embed
 

@@ -12,11 +12,13 @@ async def on_ready():
 
 
 extensions = [
+    'commands.admin',
     'commands.assist',
     'commands.server',
 ]
 
 if __name__ == '__main__':
+    client.remove_command('help')
     for extension in extensions:
         client.load_extension(extension)
-    client.run(getenv('TOKEN'))
+    client.run(getenv('TOKEN_ASSIST'))

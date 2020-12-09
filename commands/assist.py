@@ -7,12 +7,13 @@ from college import College
 from major import Major
 from emojis import emojis, numeric_emojis, num_emojis
 from page import Page
-
+from utils import pad_z
 
 url = 'https://assist.org/api/institutions'
 allInstitutions = requests.get(url).json()
 
-class Admin(commands.Cog):
+
+class Assist(commands.Cog):
 
     def __init__(self, client):
         self.client = client
@@ -37,9 +38,9 @@ class Admin(commands.Cog):
         elif len(options) == 1:
 
             kind = kind.split()[0]
-            kind += "." * (6 - len(kind))
+            kind += ' ' * (6 - len(kind))
 
-            description = f'{emojis["check"]}`{kind}` {options[0].name}'
+            description = f'{emojis["check"]} `{pad_z(kind)}` {options[0].name}'
 
             return options[0], description
 
@@ -47,36 +48,7 @@ class Admin(commands.Cog):
             title = f'Choose from these {len(options)} options for your {kind}:'
 
             # Tell users what options they have.
-            pages = []
-
-            def addPage(page):
-                if pages:
-                    page.prev = pages[-1]
-                    pages[-1].next = page
-                pages.append(page)
-
-            msg = ''
-            count = 0
-            page_num = 1
-            for i in range(len(options)):
-                
-                if count >= 5:
-                    page = Page(title, msg, count, page_num)
-                    addPage(page)
-                    msg = ''
-                    count = 0
-                    page_num += 1
-
-                msg += f'`{count + 1}` {options[i].name} '
-
-                if kind == 'Home College' or kind == 'Target College':
-                    msg += f'**{options[i].code}**'
-                
-                msg += '\n\n'
-                count += 1
-            
-            page = Page(title, msg, count, page_num)
-            addPage(page)
+            pages = generatePages(title, options, kind)
 
             embed = pages[0].getEmbed()
             msg = await ctx.channel.send(embed=embed)
@@ -101,24 +73,26 @@ class Admin(commands.Cog):
 
                     if str(reaction.emoji) == emojis['next']:
                         curr = curr.next
-                        await msg.edit(embed=curr.getEmbed())
-                        await self.showReactions(msg, curr)
 
                     elif str(reaction.emoji) == emojis['back']:
                         curr = curr.prev
-                        await msg.edit(embed=curr.getEmbed())
-                        await self.showReactions(msg, curr)
-                    
+
+                    elif str(reaction.emoji) == emojis['exit']:
+                        await msg.delete()
+                        return
+
+                    await msg.edit(embed=curr.getEmbed())
+                    await self.showReactions(msg, curr)
 
             except asyncio.TimeoutError:
-                await ctx.channel.send(":no_entry:  **Closed due to the inactivity.**")
+                await ctx.channel.send(":no_entry: **Prompt closed due to inactivity.**")
                 await msg.delete()
                 return
 
             else:
                 kind = kind.split()[0]
-                kind += "." * (6 - len(kind))
-                description = f'{emojis["check"]}`{kind}` {options[num_emojis[reaction.emoji] + 5 * (curr.page_num - 1) - 1].name}'
+                kind += ' ' * (6 - len(kind))
+                description = f'{emojis["check"]} `{pad_z(kind)}` {options[num_emojis[reaction.emoji] + 5 * (curr.page_num - 1) - 1].name}'
                 await msg.delete()
                 return options[num_emojis[reaction.emoji] + 5 * (curr.page_num - 1) - 1], description
 
@@ -134,6 +108,8 @@ class Admin(commands.Cog):
         if page.hasNext():
             await msg.add_reaction(emojis['next'])
 
+        await msg.add_reaction(emojis['exit'])
+
 
     @commands.command()
     async def assist(self, ctx, *arg):
@@ -146,7 +122,7 @@ class Admin(commands.Cog):
         # Check if arg is empty.
         if len(arg) != 3:
             await ctx.channel.send(
-                'Please follow this format:\n?assist  **"Home College"**  **"Target College"**  **"Target Major"**'
+                'Usage: `?assist "Home College" "Target College" "Target Major"`'
             )
 
         home_college = arg[0]
@@ -162,7 +138,7 @@ class Admin(commands.Cog):
 
         embed = discord.Embed(
             title="Assist Report",
-            description = description
+            description=description
         )
 
         msg = await ctx.channel.send(embed=embed)
@@ -181,10 +157,10 @@ class Admin(commands.Cog):
             await msg.delete()
             return
 
-        receiving_id = final_target_college.id
-
         embed.description += '\n' + description2
         await msg.edit(embed=embed)
+
+        receiving_id = final_target_college.id
 
         # Get the receiving_id of users' final home college.
         if not receiving_id:
@@ -197,7 +173,7 @@ class Admin(commands.Cog):
         #
         if not agreement:
             await ctx.channel.send(
-                f"Sorry there is no agreement between {final_home_college.name} and {final_target_college.name}"
+                f"Sorry, there is no agreement between {final_home_college.name} and {final_target_college.name}"
             )
             return
 
@@ -215,21 +191,19 @@ class Admin(commands.Cog):
             return
 
         embed.description += '\n' + description3
-        await msg.edit(embed=embed)
 
         for major in reports:
             if major['label'] == final_major.name:
                 key = major['key']
 
         if key:
-            
-            embed.description += f"\n{emojis['flag']}`Report` **Your report is at**"
+            embed.description += f"\n{emojis['flag']} `Report` **Your report is at**"
             embed.description += f"\n**https://assist.org/transfer/report/{key}**"
-
         else:
-            embed.description += "\nSorry I didn't find your agreement..."
+            embed.description += "\nSorry, I didn't find your agreement..."
 
         await msg.edit(embed=embed)
+
 
 def findColleges(target):
     """
@@ -311,6 +285,40 @@ def latestAgreement(sending_id, receiving_id):
     return 0
 
 
+def generatePages(title, options, kind):
+    pages = []
+
+    # Group options into bunches of 5
+    num_per_page = 5
+    grouped_options = [options[n:n+num_per_page] for n in range(0, len(options), num_per_page)]
+
+    for page_index, items in enumerate(grouped_options):
+        msg = ''
+
+        for opt_index, option in enumerate(items):
+            msg += f'`{opt_index + 1}` {option.name} '
+
+            if kind == 'Home College' or kind == 'Target College':
+                msg += f'**{option.code}**'
+
+            msg += '\n\n'
+
+        page = Page(
+            title,
+            msg,
+            count=opt_index + 1,
+            page_num=page_index + 1,
+            total_pages=len(grouped_options)
+        )
+
+        if pages:
+            page.prev = pages[-1]
+            pages[-1].next = page
+
+        pages.append(page)
+
+    return pages
+
 
 def setup(client):
-    client.add_cog(Admin(client))
+    client.add_cog(Assist(client))
