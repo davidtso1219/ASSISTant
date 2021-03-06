@@ -3,6 +3,7 @@ import asyncio
 import discord
 
 from discord.ext import commands
+
 from college import College
 from major import Major
 from emojis import emojis, numeric_emojis, num_emojis
@@ -51,6 +52,7 @@ class Assist(commands.Cog):
             pages = generatePages(title, options, kind)
 
             embed = pages[0].getEmbed()
+
             msg = await ctx.channel.send(embed=embed)
             await self.showReactions(msg, pages[0])
 
@@ -112,7 +114,7 @@ class Assist(commands.Cog):
 
 
     @commands.command()
-    async def assist(self, ctx, *arg):
+    async def assist(self, ctx, home_college: str = '', target_college: str = '', *, major: str = ''):
         """
         First, find the possible options that the user might refer to, and help them choose.
         Second, do the same thing to the possible target colleges and the possible majors.
@@ -120,21 +122,23 @@ class Assist(commands.Cog):
         """
 
         # Check if arg is empty.
-        if len(arg) != 3:
+        if not (home_college and target_college and major):
             await ctx.channel.send(
                 'Usage: `?assist "Home College" "Target College" "Target Major"`'
             )
-
-        home_college = arg[0]
-        target_college = arg[1]
-        major = arg[2]
+            return
 
         # Generate the home college options.
         home_options = findColleges(home_college)
 
         # Show them the options and make them choose.
         final_home_college, description = await self.select(ctx, home_options, 'Home College')
-        sending_id = final_home_college.id
+
+        if final_home_college:
+            sending_id = final_home_college.id
+
+        else:
+            description = f'{emojis["ban"]} `Home  ` Not Found!'
 
         embed = discord.Embed(
             title="Assist Report",
@@ -142,6 +146,9 @@ class Assist(commands.Cog):
         )
 
         msg = await ctx.channel.send(embed=embed)
+
+        if not final_home_college:
+            return
 
         # Get the sending_id of users' final home college.
         if not sending_id:
@@ -156,9 +163,15 @@ class Assist(commands.Cog):
         except TypeError:
             await msg.delete()
             return
-
-        embed.description += '\n' + description2
-        await msg.edit(embed=embed)
+        
+        if not final_target_college:
+            embed.description += '\n' + f'{emojis["ban"]} `Target` Not Found!'
+            await msg.edit(embed=embed)
+            return
+        else:
+            print(description2)
+            embed.description += '\n' + description2
+            await msg.edit(embed=embed)
 
         receiving_id = final_target_college.id
 
@@ -184,6 +197,11 @@ class Assist(commands.Cog):
 
         major_options = findMajor(major, reports)
 
+        if not major_options:
+            embed.description += '\n' + f'{emojis["ban"]} `Major ` Not Found!'
+            await msg.edit(embed=embed)
+            return
+
         try:
             final_major, description3 = await self.select(ctx, major_options, 'Major')
         except TypeError:
@@ -205,7 +223,7 @@ class Assist(commands.Cog):
         await msg.edit(embed=embed)
 
 
-def findColleges(target):
+def findColleges(target, institutions=allInstitutions):
     """
     Find the option that is exactly the same as users' targets or the options that contain users' targets.
     """
@@ -217,7 +235,7 @@ def findColleges(target):
     options = []
 
     # Loop through allInstitution to find potential institution.
-    for institution in allInstitutions:
+    for institution in institutions:
 
         code = institution['code'].split()[0]
         names = institution['names']
@@ -252,18 +270,14 @@ def findMajor(target, majors):
         return []
 
     options = []
-    words = target.split()
+    words = target.lower().split()
 
     # Loop through allInstitution to find potential institution.
     for major in majors:
+        label = major['label'].lower()
 
-        label = major['label']
-
-        for word in words:
-
-            if word.lower() in label.lower():
-                options.append(Major(label))
-                break
+        if all([word in label for word in words]):
+            options.append(Major(major['label']))
 
     return options
 
@@ -279,8 +293,19 @@ def latestAgreement(sending_id, receiving_id):
     intuitions = requests.get(url).json()
 
     for intuition in intuitions:
+
         if intuition["institutionParentId"] == receiving_id:
-            return max(intuition['receivingYearIds'])
+            years = intuition['receivingYearIds'][::-1]
+
+            for year in years:
+
+                url = f'https://assist.org/api/agreements/categories?receivingInstitutionId={receiving_id}&sendingInstitutionId={sending_id}&academicYearId={year}'
+
+                category = requests.get(url).json()
+
+                if category[0]['hasReports']:
+                    return year
+
 
     return 0
 

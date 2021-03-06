@@ -1,0 +1,47 @@
+[
+    {
+        "name": "University of California, San Diego",
+        "code": "UCSD",
+        "id": 7
+    },
+    {
+        "name": "University of California, Riverside",
+        "code": "UCR",
+        "id": 46
+    },
+    {
+        "name": "University of California, Berkeley",
+        "code": "UCB",
+        "id": 79
+    },
+    {
+        "name": "University of California, Davis",
+        "code": "UCD",
+        "id": 89
+    },
+    {
+        "name": "University of California, Los Angeles",
+        "code": "UCLA",
+        "id": 117
+    },
+    {
+        "name": "University of California, Irvine",
+        "code": "UCI",
+        "id": 120
+    },
+    {
+        "name": "University of California, Santa Barbara",
+        "code": "UCSB",
+        "id": 128
+    },
+    {
+        "name": "University of California, Santa Cruz",
+        "code": "UCSC",
+        "id": 132
+    },
+    {
+        "name": "University of California, Merced",
+        "code": "UCM",
+        "id": 144
+    }
+]

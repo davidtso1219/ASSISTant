@@ -1,4 +1,4 @@
-# class SalaryNotInRangeError(Exception):
+# class MajorNotFound(Exception):
 #     """Exception raised for errors in the input salary.
 
 #     Attributes:
@@ -6,7 +6,7 @@
 #         message -- explanation of the error
 #     """
 
-#     def __init__(self, salary, message="Salary is not in (5000, 15000) range"):
+#     def __init__(self, salary, message="There is no reports"):
 #         self.salary = salary
 #         self.message = message
 #         super().__init__(self.message)

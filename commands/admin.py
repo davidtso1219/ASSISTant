@@ -28,7 +28,7 @@ class Admin(commands.Cog):
     async def before_invoke(self, ctx):
         print(f'[command] "{ctx.author}" invoked "{ctx.command.name}" with "{ctx.message.content}"')
 
-    @commands.command()
+    @commands.command(aliases=['r'])
     async def reload(self, ctx, ext_name: str = ''):
         if not ext_name:
             await ctx.send('No extension name specified')

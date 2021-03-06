@@ -8,8 +8,9 @@ NOTE: repl.it still shuts the server down at a certain time each day
 import requests
 import threading
 import logging
+import json
 
-from flask import Flask, request
+from flask import Flask, request, jsonify, current_app
 from discord.ext import tasks
 
 log = logging.getLogger('werkzeug')
@@ -17,12 +18,52 @@ log.setLevel(logging.ERROR)
 
 PORT = 3000
 server = None
-app = Flask(__name__)
+app = Flask(__name__,
+            static_url_path='', 
+            static_folder='../static')
+
+app.config['SEND_FILE_MAX_AGE_DEFAULT'] = 0
 
 
 @app.route('/')
 def homepage():
-    return 'The bot is up and running!'
+    return current_app.send_static_file('index.html')
+
+
+def include_in_filter(query):
+    def check(option):
+        words = query.lower().split()
+        label = f"{option['Campus'].lower()} {option['Major'].lower()}"
+
+        return all([word in label for word in words])
+
+    return check
+
+
+@app.route('/api/stats/search')
+def search_stats():
+    query = request.args.get('q')
+
+    with open('data/allData.json') as f:
+        allData = json.load(f)
+
+    options = []
+
+    for campus, campus_data in allData.items():
+        for major_info in campus_data.values():
+            major_info['Major'] = major_info['Major'].title()
+            major_info['Campus'] = campus
+            options.append(major_info)
+            # data = {}
+            # data['campus'] = campus
+            # data['major'] = major
+            # data['info'] = major_info
+            # options.append(data)
+
+    if not query:
+        return jsonify(options)
+
+    return jsonify(list(filter(include_in_filter(query), options)))
 
 
 @app.route('/shutdown')

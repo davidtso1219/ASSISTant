@@ -5,7 +5,8 @@ emojis = {
     'back' : '◀️',
     'check' : ":white_check_mark:",
     'flag' : ":checkered_flag:",
-    'exit' : "🗑️"
+    'exit' : "🗑️",
+    'ban' : "🚫"
 }
 
 num_emojis = {
